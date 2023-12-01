@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 
+# Students: Jordan Mosakowski, Maya Murphy, Chris Bird
+# Final Project: Project Hades
+# Date: December 1st, 2023
+# Acknowledgements: Code partially used to generate marker arrays: https://answers.ros.org/question/373802/minimal-working-example-for-rviz-marker-publishing/
+# Furthermore, we used the code for the Move Group Python Interface tutorial as a base, but heavily modified it to do what we accomplished. We have included the lecense for it below.
 
 # Software License Agreement (BSD License)
 #
@@ -36,15 +41,6 @@
 # Author: Acorn Pooley, Mike Lautman
 
 
-## BEGIN_SUB_TUTORIAL imports
-##
-## To use the Python MoveIt interfaces, we will import the `moveit_commander`_ namespace.
-## This namespace provides us with a `MoveGroupCommander`_ class, a `PlanningSceneInterface`_ class,
-## and a `RobotCommander`_ class. (More on these below)
-##
-## We also import `rospy`_ and some messages that we will use:
-##
-
 
 import sys
 import copy
@@ -60,12 +56,7 @@ from tf.transformations import quaternion_from_euler
 from trajectory_msgs.msg import JointTrajectoryPoint
 from visualization_msgs.msg import Marker, MarkerArray
 
-
-
-
 tau = pi * 2
-## END_SUB_TUTORIAL
-
 
 def all_close(goal, actual, tolerance):
  """
@@ -92,7 +83,7 @@ def all_close(goal, actual, tolerance):
 
  return True
 
-
+# Helper function to make pose given an x,y,z position and orientation w
 def make_pose(x,y,z,w):
    pose = PoseStamped()
    pose.header.frame_id = "panda_link0"
@@ -108,12 +99,9 @@ class ProjectHades(object):
  def __init__(self):
    super(ProjectHades, self).__init__()
 
-
-   ## BEGIN_SUB_TUTORIAL setup
-   ##
    ## First initialize `moveit_commander`_ and a `rospy`_ node:
    moveit_commander.roscpp_initialize(sys.argv)
-   rospy.init_node('move_group_python_interface_tutorial',
+   rospy.init_node('project_hades',
                    anonymous=True)
 
 
@@ -143,65 +131,30 @@ class ProjectHades(object):
                                                   queue_size=20)
 
 
-   ## END_SUB_TUTORIAL
-
-
-   ## BEGIN_SUB_TUTORIAL basic_info
-   ##
-   ## Getting Basic Information
-   ## ^^^^^^^^^^^^^^^^^^^^^^^^^
-   # We can get the name of the reference frame for this robot:
-   planning_frame = group.get_planning_frame()
-   # print("============ Reference frame: %s" % planning_frame)
-
-
-   # We can also print(the name of the end-effector link for this group:
-   eef_link = group.get_end_effector_link()
-   # print("============ End effector: %s" % eef_link)
-
-
-   # We can get a list of all the groups in the robot:
-   group_names = robot.get_group_names()
-   # print("============ Robot Groups:", robot.get_group_names())
-
-
-   # Sometimes for debugging it is useful to print(the entire state of the
-   # robot:
-   # print("============ Printing robot state")
-   # print(robot.get_current_state())
-   # print("")
-   ## END_SUB_TUTORIAL
-
-
    markers_pub = rospy.Publisher(
            "visualization_marker_array",
            MarkerArray,
            queue_size=1)
    rospy.sleep(2)
           
-
-
-   # Misc variables
+   # Allow the functions to call the variables
    self.markers_pub = markers_pub
    self.markers = MarkerArray()
-   self.box_name = ''
    self.robot = robot
    self.scene = scene
    self.group = group
    self.display_trajectory_publisher = display_trajectory_publisher
-   self.planning_frame = planning_frame
-   self.eef_link = eef_link
-   self.group_names = group_names
+   self.eef_link = group.get_end_effector_link()
 
-
- def open_gripper(self):
+ # Helper function to open the hand
+ def open_gripper(self, amt=0.03):
    grabber_group = moveit_commander.MoveGroupCommander("panda_hand")
    grabber_goal = grabber_group.get_current_joint_values()
-   grabber_goal[0] = 0.03
-   grabber_goal[1] = 0.03
+   grabber_goal[0] = amt
+   grabber_goal[1] = amt
    grabber_group.go(grabber_goal, wait = True)
 
-
+ # Helper function to close the hand
  def close_gripper(self, amt=0.01):
    grabber_group = moveit_commander.MoveGroupCommander("panda_hand")
    grabber_goal = grabber_group.get_current_joint_values()
@@ -213,21 +166,24 @@ class ProjectHades(object):
 
 
  def add_objects(self):
+   # create the surface that the samples sit on
    self.scene.add_box("table",make_pose(0.5,0,0.39,1.0),(0.2,0.6,0.02))
-   # self.scene.add_box("table",make_pose(0,0.5,0.2,1.0),(0.4,0.2,0.4))
-   # self.scene.add_box("object",make_pose(0.5,0,0.5,1.0),(0.02,0.02,0.2))
+
+   # create the object for collecting the water samples
    self.scene.add_box("watersampler",make_pose(0.5,0.2,0.5,1.0),(0.02,0.02,0.2))
+
+   # create the object to represent the surface sampler, which consists of a vertical stick and horizontal cylinder
    self.scene.add_box("surfacesampler",make_pose(0.5,0,0.5,1.0),(0.02,0.02,0.2))
    pose = make_pose(0.5,0,0.41,1.0)
    orientation = quaternion_from_euler(-tau/4, 0, 0)
    pose.pose.orientation = Quaternion(*orientation)
    self.scene.add_cylinder("surfacesampler2",pose,0.14, 0.01)
 
-
+   # create the object to take air measurements
    self.scene.add_box("airsampler",make_pose(0.5,-0.2,0.45,1.0), (0.04,0.04,0.1))
 
 
-   # create a blue box
+   # Create a lake
    marker = Marker()
    marker.header.frame_id = "panda_link0"
    marker.lifetime = rospy.Duration.from_sec(300)
@@ -248,7 +204,8 @@ class ProjectHades(object):
    marker.id = 0
    print("Adding Marker")
    self.markers.markers.append(marker)
-   # while not rospy.is_shutdown():
+
+   # Create grass
    marker = Marker()
    marker.header.frame_id = "panda_link0"
    marker.lifetime = rospy.Duration.from_sec(300)
@@ -320,59 +277,11 @@ class ProjectHades(object):
    current_joints = self.group.get_current_joint_values()
    return all_close(joint_goal, current_joints, 0.01)
 
-
- def go_to_pose_goal(self):
-   # Copy class variables to local variables to make the web tutorials more clear.
-   # In practice, you should use the class variables directly unless you have a good
-   # reason not to.
-   group = self.group
-
-
-   ## BEGIN_SUB_TUTORIAL plan_to_pose
-   ##
-   ## Planning to a Pose Goal
-   ## ^^^^^^^^^^^^^^^^^^^^^^^
-   ## We can plan a motion for this group to a desired pose for the
-   ## end-effector:
-   pose_goal = geometry_msgs.msg.Pose()
-   orientation = quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4)
-   pose_goal.orientation = Quaternion(*orientation)
-   pose_goal.position.x = 0.415
-   pose_goal.position.y = 0.0
-   pose_goal.position.z = 0.5
-   group.set_pose_target(pose_goal)
-   print("GO")
-   ## Now, we call the planner to compute the plan and execute it.
-   plan = group.go(wait=True)
-  
-   print("STOP")
-   # Calling `stop()` ensures that there is no residual movement
-   group.stop()
-
-
-   print("CLEAR")
-   # It is always good to clear your targets after planning with poses.
-   # Note: there is no equivalent function for clear_joint_value_targets()
-   group.clear_pose_targets()
-
-
-   ## END_SUB_TUTORIAL
-
-
-   # For testing:
-   # Note that since this section of code will not be included in the tutorials
-   # we use the class variable rather than the copied state variable
-   current_pose = self.group.get_current_pose().pose
-   return all_close(pose_goal, current_pose, 0.01)
-
-
- def grab_water(self):
+ # Take measurements of turbidity and benzene in the water.
+ def sample_water(self):
    self.go_to_joint_state()
-  
-   print("OPENING")
    self.open_gripper()
-  
-   print("EXECUTING")
+
    waypoints = []
    wpose = self.group.get_current_pose().pose
    # orientation is from the side of the box
@@ -398,7 +307,6 @@ class ProjectHades(object):
    self.close_gripper()
    self.attach_box("watersampler")
    self.go_to_joint_state()
-   print("Moving")
    waypoints = []
    wpose = self.group.get_current_pose().pose
    # orientation is from the side of the box
@@ -421,11 +329,10 @@ class ProjectHades(object):
                                        0.01,        # eef_step
                                        0.0)         # jump_threshold
    self.group.execute(plan, wait=True)
-   print("Sampling")
+   print("----------------\nTAKING WATER MEASUREMENTS")
    rospy.sleep(3)
-
-
-   print("Returning")
+   print("Benzeze: 18ppb")
+   print("Turbidity: 75 NTU")
    self.go_to_joint_state()
    waypoints = []
    wpose = self.group.get_current_pose().pose
@@ -451,9 +358,10 @@ class ProjectHades(object):
    self.group.execute(plan, wait=True)
    self.detach_box("watersampler")
    self.open_gripper()
+   print("FINISHED WATER MEASUREMENTS\n\n\n")
 
-
- def grab_surface(self):
+ # Collect a sample of the surface material
+ def sample_surface(self):
        self.go_to_joint_state()
        self.open_gripper()
        self.close_gripper(0.02)
@@ -483,8 +391,6 @@ class ProjectHades(object):
        self.attach_box("surfacesampler2")
        self.go_to_joint_state()
 
-
-       print("Moving")
        waypoints = []
        wpose = self.group.get_current_pose().pose
        # orientation is from the side of the box
@@ -507,7 +413,7 @@ class ProjectHades(object):
                                            0.01,        # eef_step
                                            0.0)         # jump_threshold
        self.group.execute(plan, wait=True)
-       print("Sampling")
+       print("----------------\nCOLLECTING SAMPLE OF SURFACE")
        rospy.sleep(1)
        waypoints = []
        wpose = self.group.get_current_pose().pose
@@ -559,9 +465,10 @@ class ProjectHades(object):
        self.detach_box("surfacesampler",wait=False)
        self.detach_box("surfacesampler2")
        self.open_gripper()
+       print("FINISHED SURFACE SAMPLE COLLECTION\n\n\n")
 
-
- def grab_air(self):
+ # measure the particulate matter and carbon monoxide levels in the air at different heights
+ def sample_air(self):
        self.go_to_joint_state()
        self.open_gripper()
        waypoints = []
@@ -586,13 +493,15 @@ class ProjectHades(object):
                                            0.0)         # jump_threshold
        self.group.execute(plan, wait=True)
        self.close_gripper(0.02)
+       print("TAKING AIR QUALITY MEASUREMENTS")
        self.attach_box("airsampler")
        rospy.sleep(1)
       
-       print("0.6 reading")
+       print("---------------\nHeight: 0.6m")
+       print("Particulate Matter 2.5: 33.8µg/m^3")
+       print("Carbon Monoxide: 1575ppm")
        waypoints = []
        wpose = self.group.get_current_pose().pose
-       # orientation is from the top
        orientation = quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4)
        wpose.orientation = Quaternion(*orientation)
        wpose.position.x = 0.4
@@ -606,10 +515,11 @@ class ProjectHades(object):
        self.group.execute(plan, wait=True)
        rospy.sleep(2)
       
-       print("0.7 reading")
+       print("---------------\nHeight: 0.7m")
+       print("Particulate Matter 2.5: 35.1µg/m^3")
+       print("Carbon Monoxide: 1600ppm")
        waypoints = []
        wpose = self.group.get_current_pose().pose
-       # orientation is from the top
        orientation = quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4)
        wpose.orientation = Quaternion(*orientation)
        wpose.position.x = 0.4
@@ -623,10 +533,11 @@ class ProjectHades(object):
        self.group.execute(plan, wait=True)
        rospy.sleep(2)
       
-       print("0.8 reading")
+       print("---------------\nHeight: 0.8m")
+       print("Particulate Matter 2.5: 36.4µg/m^3")
+       print("Carbon Monoxide: 1597ppm")
        waypoints = []
        wpose = self.group.get_current_pose().pose
-       # orientation is from the top
        orientation = quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4)
        wpose.orientation = Quaternion(*orientation)
        wpose.position.x = 0.35
@@ -640,10 +551,11 @@ class ProjectHades(object):
        self.group.execute(plan, wait=True)
        rospy.sleep(2)
       
-       print("0.9 reading")
+       print("---------------\nHeight: 0.9m")
+       print("Particulate Matter 2.5: 36.9µg/m^3")
+       print("Carbon Monoxide: 1607ppm")
        waypoints = []
        wpose = self.group.get_current_pose().pose
-       # orientation is from the top
        orientation = quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4)
        wpose.orientation = Quaternion(*orientation)
        wpose.position.x = 0.30
@@ -658,11 +570,11 @@ class ProjectHades(object):
        rospy.sleep(2)
 
 
-       # self.go_to_joint_state()
-       print("1.0 reading")
+       print("---------------\nHeight: 1.0m")
+       print("Particulate Matter 2.5: 38.2µg/m^3")
+       print("Carbon Monoxide: 1684ppm")
        waypoints = []
        wpose = self.group.get_current_pose().pose
-       # orientation is from the top
        orientation = quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4)
        wpose.orientation = Quaternion(*orientation)
        wpose.position.x = 0.3
@@ -677,11 +589,12 @@ class ProjectHades(object):
        rospy.sleep(2)
 
 
-       # self.go_to_joint_state()
-       print("1.1 reading")
+
+       print("---------------\nHeight: 1.1m")
+       print("Particulate Matter 2.5: 37.6µg/m^3")
+       print("Carbon Monoxide: 1643ppm")
        waypoints = []
        wpose = self.group.get_current_pose().pose
-       # orientation is from the top
        orientation = quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4)
        wpose.orientation = Quaternion(*orientation)
        wpose.position.x = 0.25
@@ -695,12 +608,11 @@ class ProjectHades(object):
        self.group.execute(plan, wait=True)
        rospy.sleep(2)
 
-
-       # self.go_to_joint_state()
-       print("1.2 reading")
+       print("---------------\nHeight: 1.2m")
+       print("Particulate Matter 2.5: 37.3µg/m^3")
+       print("Carbon Monoxide: 1656ppm")
        waypoints = []
        wpose = self.group.get_current_pose().pose
-       # orientation is from the top
        orientation = quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4)
        wpose.orientation = Quaternion(*orientation)
        wpose.position.x = 0.20
@@ -719,7 +631,6 @@ class ProjectHades(object):
        # return
        waypoints = []
        wpose = self.group.get_current_pose().pose
-       # orientation is from the top
        orientation = quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4)
        wpose.orientation = Quaternion(*orientation)
        wpose.position.x = 0.4
@@ -740,112 +651,11 @@ class ProjectHades(object):
        self.group.execute(plan, wait=True)
        self.detach_box("airsampler")
        self.open_gripper()
-
-
-
-
- def plan_cartesian_path(self, scale=1):
-   # Copy class variables to local variables to make the web tutorials more clear.
-   # In practice, you should use the class variables directly unless you have a good
-   # reason not to.
-   group = self.group
-
-
-   ## BEGIN_SUB_TUTORIAL plan_cartesian_path
-   ##
-   ## Cartesian Paths
-   ## ^^^^^^^^^^^^^^^
-   ## You can plan a Cartesian path directly by specifying a list of waypoints
-   ## for the end-effector to go through:
-   ##
-   waypoints = []
-
-
-   wpose = group.get_current_pose().pose
-   wpose.position.z -= scale * 0.1  # First move up (z)
-   wpose.position.y += scale * 0.2  # and sideways (y)
-   waypoints.append(copy.deepcopy(wpose))
-
-
-   wpose.position.x += scale * 0.1  # Second move forward/backwards in (x)
-   waypoints.append(copy.deepcopy(wpose))
-
-
-   wpose.position.y -= scale * 0.1  # Third move sideways (y)
-   waypoints.append(copy.deepcopy(wpose))
-
-
-   # We want the Cartesian path to be interpolated at a resolution of 1 cm
-   # which is why we will specify 0.01 as the eef_step in Cartesian
-   # translation.  We will disable the jump threshold by setting it to 0.0 disabling:
-   (plan, fraction) = group.compute_cartesian_path(
-                                      waypoints,   # waypoints to follow
-                                      0.01,        # eef_step
-                                      0.0)         # jump_threshold
-
-
-   # Note: We are just planning, not asking move_group to actually move the robot yet:
-   return plan, fraction
-
-
-   ## END_SUB_TUTORIAL
-
-
- def display_trajectory(self, plan):
-   # Copy class variables to local variables to make the web tutorials more clear.
-   # In practice, you should use the class variables directly unless you have a good
-   # reason not to.
-   robot = self.robot
-   display_trajectory_publisher = self.display_trajectory_publisher
-
-
-   ## BEGIN_SUB_TUTORIAL display_trajectory
-   ##
-   ## Displaying a Trajectory
-   ## ^^^^^^^^^^^^^^^^^^^^^^^
-   ## You can ask RViz to visualize a plan (aka trajectory) for you. But the
-   ## group.plan() method does this automatically so this is not that useful
-   ## here (it just displays the same trajectory again):
-   ##
-   ## A `DisplayTrajectory`_ msg has two primary fields, trajectory_start and trajectory.
-   ## We populate the trajectory_start with our current robot state to copy over
-   ## any AttachedCollisionObjects and add our plan to the trajectory.
-   display_trajectory = moveit_msgs.msg.DisplayTrajectory()
-   display_trajectory.trajectory_start = robot.get_current_state()
-   display_trajectory.trajectory.append(plan)
-   # Publish
-   display_trajectory_publisher.publish(display_trajectory);
-
-
-   ## END_SUB_TUTORIAL
-
-
- def execute_plan(self, plan):
-   # Copy class variables to local variables to make the web tutorials more clear.
-   # In practice, you should use the class variables directly unless you have a good
-   # reason not to.
-   group = self.group
-
-
-   ## BEGIN_SUB_TUTORIAL execute_plan
-   ##
-   ## Executing a Plan
-   ## ^^^^^^^^^^^^^^^^
-   ## Use execute if you would like the robot to follow
-   ## the plan that has already been computed:
-   group.execute(plan, wait=True)
-
-
-   ## **Note:** The robot's current joint state must be within some tolerance of the
-   ## first waypoint in the `RobotTrajectory`_ or ``execute()`` will fail
-   ## END_SUB_TUTORIAL
-
-
+       print("FINISHED AIR QUALITY MEASUREMENTS\n\n\n")
  def wait_for_state_update(self, box_is_known=False, box_is_attached=False, timeout=4):
    # Copy class variables to local variables to make the web tutorials more clear.
    # In practice, you should use the class variables directly unless you have a good
    # reason not to.
-   box_name = self.box_name
    scene = self.scene
 
 
@@ -864,13 +674,13 @@ class ProjectHades(object):
    seconds = rospy.get_time()
    while (seconds - start < timeout) and not rospy.is_shutdown():
      # Test if the box is in attached objects
-     attached_objects = scene.get_attached_objects([box_name])
+     attached_objects = scene.get_attached_objects([''])
      is_attached = len(attached_objects.keys()) > 0
 
 
      # Test if the box is in the scene.
      # Note that attaching the box will remove it from known_objects
-     is_known = box_name in scene.get_known_object_names()
+     is_known = '' in scene.get_known_object_names()
 
 
      # Test if we are in the expected state
@@ -888,35 +698,6 @@ class ProjectHades(object):
    ## END_SUB_TUTORIAL
 
 
- def add_box(self, timeout=4):
-   # Copy class variables to local variables to make the web tutorials more clear.
-   # In practice, you should use the class variables directly unless you have a good
-   # reason not to.
-   box_name = self.box_name
-   scene = self.scene
-
-
-   ## BEGIN_SUB_TUTORIAL add_box
-   ##
-   ## Adding Objects to the Planning Scene
-   ## ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   ## First, we will create a box in the planning scene at the location of the left finger:
-   box_pose = geometry_msgs.msg.PoseStamped()
-   box_pose.header.frame_id = "panda_leftfinger"
-   box_pose.pose.orientation.w = 1.0
-   box_name = "box"
-   scene.add_box(box_name, box_pose, size=(0.1, 0.1, 0.1))
-
-
-   ## END_SUB_TUTORIAL
-   # Copy local variables back to class variables. In practice, you should use the class
-   # variables directly unless you have a good reason not to.
-   self.box_name=box_name
-   return self.wait_for_state_update(box_is_known=True, timeout=timeout)
-
-
-
-
  def attach_box(self,box_name,wait=True, timeout=4):
    # Copy class variables to local variables to make the web tutorials more clear.
    # In practice, you should use the class variables directly unless you have a good
@@ -924,7 +705,6 @@ class ProjectHades(object):
    robot = self.robot
    scene = self.scene
    eef_link = self.eef_link
-   group_names = self.group_names
 
 
    ## BEGIN_SUB_TUTORIAL attach_object
@@ -966,31 +746,6 @@ class ProjectHades(object):
        return self.wait_for_state_update(box_is_known=True, box_is_attached=False, timeout=timeout)
 
 
- def remove_box(self, timeout=4):
-   # Copy class variables to local variables to make the web tutorials more clear.
-   # In practice, you should use the class variables directly unless you have a good
-   # reason not to.
-   box_name = self.box_name
-   scene = self.scene
-
-
-   ## BEGIN_SUB_TUTORIAL remove_object
-   ##
-   ## Removing Objects from the Planning Scene
-   ## ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   ## We can remove the box from the world.
-   scene.remove_world_object(box_name)
-
-
-   ## **Note:** The object must be detached before we can remove it from the world
-   ## END_SUB_TUTORIAL
-
-
-   # We wait for the planning scene to update.
-   return self.wait_for_state_update(box_is_attached=False, box_is_known=False, timeout=timeout)
-
-
-
 
 def main():
  try:
@@ -999,85 +754,15 @@ def main():
 
    hades.add_objects()
 
-
    rospy.sleep(1)
-
-
-   # print("Joint state")
-   # hades.go_to_joint_state()
-   # rospy.sleep(5)
-
-
-   # move_to_table1()
   
-   print("Air")
-   hades.grab_air()
-   print("Water")
-   hades.grab_water()
-   print("Surface")
-   hades.grab_surface()
-
-
-   # print("Grab")
-   # hades.attach_box("surfacesampler")
-   # print("Joint")
-   # hades.go_to_joint_state()
-
+   hades.sample_air()
+  #  print("Water")
+   hades.sample_water()
+  #  print("Surface")
+   hades.sample_surface()
 
    rospy.sleep(5)
-
-
-   # print("============ Press `Enter` to execute a movement using a joint state goal ...")
-   # input()
-   # hades.go_to_joint_state()
-
-
-   # print("============ Press `Enter` to execute a movement using a pose goal ...")
-   # input()
-   # hades.go_to_pose_goal()
-
-
-   # print("============ Press `Enter` to plan and display a Cartesian path ...")
-   # input()
-   # cartesian_plan, fraction = hades.plan_cartesian_path()
-
-
-   # print("============ Press `Enter` to display a saved trajectory (this will replay the Cartesian path)  ...")
-   # input()
-   # hades.display_trajectory(cartesian_plan)
-
-
-   # print("============ Press `Enter` to execute a saved path ...")
-   # input()
-   # hades.execute_plan(cartesian_plan)
-   # rospy.sleep(10)
-
-
-   # print("============ Press `Enter` to add a box to the planning scene ...")
-   # input()
-   # hades.add_box()
-
-
-   # print("============ Press `Enter` to attach a Box to the Panda robot ...")
-   # input()
-   # hades.attach_box()
-
-
-   # print("============ Press `Enter` to plan and execute a path with an attached collision object ...")
-   # input()
-   # cartesian_plan, fraction = hades.plan_cartesian_path(scale=-1)
-   # hades.execute_plan(cartesian_plan)
-
-
-   # print("============ Press `Enter` to detach the box from the Panda robot ...")
-   # input()
-   # hades.detach_box()
-
-
-   # print("============ Press `Enter` to remove the box from the planning scene ...")
-   # input()
-   # hades.remove_box()
-
 
    hades.go_to_joint_state()
    hades.clear()
@@ -1090,43 +775,3 @@ def main():
 
 if __name__ == '__main__':
  main()
-
-
-## BEGIN_TUTORIAL
-## .. _moveit_commander:
-##    http://docs.ros.org/kinetic/api/moveit_commander/html/namespacemoveit__commander.html
-##
-## .. _MoveGroupCommander:
-##    http://docs.ros.org/kinetic/api/moveit_commander/html/classmoveit__commander_1_1move__group_1_1MoveGroupCommander.html
-##
-## .. _RobotCommander:
-##    http://docs.ros.org/kinetic/api/moveit_commander/html/classmoveit__commander_1_1robot_1_1RobotCommander.html
-##
-## .. _PlanningSceneInterface:
-##    http://docs.ros.org/kinetic/api/moveit_commander/html/classmoveit__commander_1_1planning__scene__interface_1_1PlanningSceneInterface.html
-##
-## .. _DisplayTrajectory:
-##    http://docs.ros.org/kinetic/api/moveit_msgs/html/msg/DisplayTrajectory.html
-##
-## .. _RobotTrajectory:
-##    http://docs.ros.org/kinetic/api/moveit_msgs/html/msg/RobotTrajectory.html
-##
-## .. _rospy:
-##    http://docs.ros.org/kinetic/api/rospy/html/
-## CALL_SUB_TUTORIAL imports
-## CALL_SUB_TUTORIAL setup
-## CALL_SUB_TUTORIAL basic_info
-## CALL_SUB_TUTORIAL plan_to_joint_state
-## CALL_SUB_TUTORIAL plan_to_pose
-## CALL_SUB_TUTORIAL plan_cartesian_path
-## CALL_SUB_TUTORIAL display_trajectory
-## CALL_SUB_TUTORIAL execute_plan
-## CALL_SUB_TUTORIAL add_box
-## CALL_SUB_TUTORIAL wait_for_scene_update
-## CALL_SUB_TUTORIAL attach_object
-## CALL_SUB_TUTORIAL detach_object
-## CALL_SUB_TUTORIAL remove_object
-## END_TUTORIAL
-
-
-
