@@ -276,86 +276,51 @@ class ProjectHades(object):
    # we use the class variable rather than the copied state variable
    current_joints = self.group.get_current_joint_values()
    return all_close(joint_goal, current_joints, 0.01)
-
+ 
+ def create_waypoint(self, x, y, z, orientation):
+   wpose = self.group.get_current_pose().pose
+   wpose.orientation = Quaternion(*orientation)
+   wpose.position.x = x
+   wpose.position.y = y
+   wpose.position.z = z
+   return wpose
+ 
+ def move_path(self, poses):
+   waypoints = []
+   for p in poses:
+     waypoints.append(copy.deepcopy(p))
+   (plan, fraction) = self.group.compute_cartesian_path(
+                                       waypoints,   # waypoints to follow
+                                       0.01,        # eef_step
+                                       0.0)         # jump_threshold
+   self.group.execute(plan, wait=True)
+    
  # Take measurements of turbidity and benzene in the water.
  def sample_water(self):
    self.go_to_joint_state()
    self.open_gripper()
-
-   waypoints = []
-   wpose = self.group.get_current_pose().pose
-   # orientation is from the side of the box
-   orientation = quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4)
-   wpose.orientation = Quaternion(*orientation)
-   wpose.position.x = 0.4
-   wpose.position.y = 0.2
-   wpose.position.z = 0.57
-   waypoints.append(copy.deepcopy(wpose))
-   wpose = self.group.get_current_pose().pose
-   # rotate the orientation so it grabs from the top instead of the side
-   orientation = quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4)
-   wpose.orientation = Quaternion(*orientation)
-   wpose.position.x = 0.5
-   wpose.position.y = 0.2
-   wpose.position.z = 0.57
-   waypoints.append(copy.deepcopy(wpose))
-   (plan, fraction) = self.group.compute_cartesian_path(
-                                       waypoints,   # waypoints to follow
-                                       0.01,        # eef_step
-                                       0.0)         # jump_threshold
-   self.group.execute(plan, wait=True)
+   
+   pose1 = self.create_waypoint(0.4, 0.2, 0.57, quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4))
+   pose2 = self.create_waypoint(0.5, 0.2, 0.57, quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4))
+   self.move_path([pose1, pose2])
+   
    self.close_gripper()
    self.attach_box("watersampler")
    self.go_to_joint_state()
-   waypoints = []
-   wpose = self.group.get_current_pose().pose
-   # orientation is from the side of the box
-   orientation = quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4)
-   wpose.orientation = Quaternion(*orientation)
-   wpose.position.x = 0.0
-   wpose.position.y = 0.6
-   wpose.position.z = 0.3
-   waypoints.append(copy.deepcopy(wpose))
-   wpose = self.group.get_current_pose().pose
-   # rotate the orientation so it grabs from the top instead of the side
-   orientation = quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4)
-   wpose.orientation = Quaternion(*orientation)
-   wpose.position.x = 0.0
-   wpose.position.y = 0.6
-   wpose.position.z = 0.1
-   waypoints.append(copy.deepcopy(wpose))
-   (plan, fraction) = self.group.compute_cartesian_path(
-                                       waypoints,   # waypoints to follow
-                                       0.01,        # eef_step
-                                       0.0)         # jump_threshold
-   self.group.execute(plan, wait=True)
+   
+   pose1 = self.create_waypoint(0.0, 0.6, 0.3, quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4))
+   pose2 = self.create_waypoint(0.0, 0.6, 0.1, quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4))
+   self.move_path([pose1, pose2])
+
    print("----------------\nTAKING WATER MEASUREMENTS")
    rospy.sleep(3)
    print("Benzeze: 18ppb")
    print("Turbidity: 75 NTU")
    self.go_to_joint_state()
-   waypoints = []
-   wpose = self.group.get_current_pose().pose
-   # orientation is from the side of the box
-   orientation = quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4)
-   wpose.orientation = Quaternion(*orientation)
-   wpose.position.x = 0.4
-   wpose.position.y = 0.2
-   wpose.position.z = 0.6
-   waypoints.append(copy.deepcopy(wpose))
-   wpose = self.group.get_current_pose().pose
-   # rotate the orientation so it grabs from the top instead of the side
-   orientation = quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4)
-   wpose.orientation = Quaternion(*orientation)
-   wpose.position.x = 0.5
-   wpose.position.y = 0.2
-   wpose.position.z = 0.6
-   waypoints.append(copy.deepcopy(wpose))
-   (plan, fraction) = self.group.compute_cartesian_path(
-                                       waypoints,   # waypoints to follow
-                                       0.01,        # eef_step
-                                       0.0)         # jump_threshold
-   self.group.execute(plan, wait=True)
+   pose1 = self.create_waypoint(0.4, 0.2, 0.6, quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4))
+   pose2 = self.create_waypoint(0.5, 0.2, 0.6, quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4))
+   self.move_path([pose1, pose2])
+
    self.detach_box("watersampler")
    self.open_gripper()
    print("FINISHED WATER MEASUREMENTS\n\n\n")
@@ -365,103 +330,34 @@ class ProjectHades(object):
        self.go_to_joint_state()
        self.open_gripper()
        self.close_gripper(0.02)
-       waypoints = []
-       wpose = self.group.get_current_pose().pose
-       # orientation is from the top
-       orientation = quaternion_from_euler(0, -tau/2, 0)
-       wpose.orientation = Quaternion(*orientation)
-       wpose.position.x = 0.5
-       wpose.position.y = 0
-       wpose.position.z = 0.8
-       waypoints.append(copy.deepcopy(wpose))
-       wpose = self.group.get_current_pose().pose
-       orientation = quaternion_from_euler(0, -tau/2, 0)
-       wpose.orientation = Quaternion(*orientation)
-       wpose.position.x = 0.5
-       wpose.position.y = 0
-       wpose.position.z = 0.65
-       waypoints.append(copy.deepcopy(wpose))
-       (plan, fraction) = self.group.compute_cartesian_path(
-                                           waypoints,   # waypoints to follow
-                                           0.01,        # eef_step
-                                           0.0)         # jump_threshold
-       self.group.execute(plan, wait=True)
-       # self.close_gripper()
+       pose1 = self.create_waypoint(0.5, 0, 0.8, quaternion_from_euler(0, -tau/2, 0))
+       pose2 = self.create_waypoint(0.5, 0, 0.6, quaternion_from_euler(0, -tau/2, 0))
+       self.move_path([pose1, pose2])
+       
        self.attach_box("surfacesampler",wait=False)
        self.attach_box("surfacesampler2")
        self.go_to_joint_state()
+      
+       pose1 = self.create_waypoint(0, -0.3, 0.5, quaternion_from_euler(0, -tau/2, tau/4))
+       pose2 = self.create_waypoint(0, -0.3, 0.3, quaternion_from_euler(0, -tau/2, tau/4))
+       self.move_path([pose1, pose2])
 
-       waypoints = []
-       wpose = self.group.get_current_pose().pose
-       # orientation is from the side of the box
-       orientation = quaternion_from_euler(0, -tau/2, tau/4)
-       wpose.orientation = Quaternion(*orientation)
-       wpose.position.x = 0.0
-       wpose.position.y = -0.3
-       wpose.position.z = 0.5
-       waypoints.append(copy.deepcopy(wpose))
-       wpose = self.group.get_current_pose().pose
-       # rotate the orientation so it grabs from the top instead of the side
-       orientation = quaternion_from_euler(0, -tau/2, tau/4)
-       wpose.orientation = Quaternion(*orientation)
-       wpose.position.x = 0.0
-       wpose.position.y = -0.3
-       wpose.position.z = 0.3
-       waypoints.append(copy.deepcopy(wpose))
-       (plan, fraction) = self.group.compute_cartesian_path(
-                                           waypoints,   # waypoints to follow
-                                           0.01,        # eef_step
-                                           0.0)         # jump_threshold
-       self.group.execute(plan, wait=True)
        print("----------------\nCOLLECTING SAMPLE OF SURFACE")
        rospy.sleep(1)
-       waypoints = []
-       wpose = self.group.get_current_pose().pose
-       # orientation is from the side of the box
-       orientation = quaternion_from_euler(0, -tau/2, tau/4)
-       wpose.orientation = Quaternion(*orientation)
-       wpose.position.x = 0.0
-       wpose.position.y = -0.4
-       wpose.position.z = 0.3
-       waypoints.append(copy.deepcopy(wpose))
-       wpose = self.group.get_current_pose().pose
-       # rotate the orientation so it grabs from the top instead of the side
-       orientation = quaternion_from_euler(0, -tau/2, tau/4)
-       wpose.orientation = Quaternion(*orientation)
-       wpose.position.x = 0.0
-       wpose.position.y = -0.65
-       wpose.position.z = 0.3
-       waypoints.append(copy.deepcopy(wpose))
-       (plan, fraction) = self.group.compute_cartesian_path(
-                                           waypoints,   # waypoints to follow
-                                           0.01,        # eef_step
-                                           0.0)         # jump_threshold
-       self.group.execute(plan, wait=True)
+       
+       pose1 = self.create_waypoint(0, -0.4, 0.3, quaternion_from_euler(0, -tau/2, tau/4))
+       pose2 = self.create_waypoint(0, -0.65, 0.3, quaternion_from_euler(0, -tau/2, tau/4))
+       self.move_path([pose1, pose2])
+
        rospy.sleep(3)
 
-
        self.go_to_joint_state()
-       waypoints = []
-       wpose = self.group.get_current_pose().pose
-       # orientation is from the top
-       orientation = quaternion_from_euler(0, -tau/2, 0)
-       wpose.orientation = Quaternion(*orientation)
-       wpose.position.x = 0.5
-       wpose.position.y = 0
-       wpose.position.z = 0.8
-       waypoints.append(copy.deepcopy(wpose))
-       wpose = self.group.get_current_pose().pose
-       orientation = quaternion_from_euler(0, -tau/2, 0)
-       wpose.orientation = Quaternion(*orientation)
-       wpose.position.x = 0.5
-       wpose.position.y = 0
-       wpose.position.z = 0.67
-       waypoints.append(copy.deepcopy(wpose))
-       (plan, fraction) = self.group.compute_cartesian_path(
-                                           waypoints,   # waypoints to follow
-                                           0.01,        # eef_step
-                                           0.0)         # jump_threshold
-       self.group.execute(plan, wait=True)
+
+
+       pose1 = self.create_waypoint(0.5, 0, 0.8, quaternion_from_euler(0, -tau/2, 0))
+       pose2 = self.create_waypoint(0.5, 0, 0.67, quaternion_from_euler(0, -tau/2, 0))
+       self.move_path([pose1, pose2])
+
        self.detach_box("surfacesampler",wait=False)
        self.detach_box("surfacesampler2")
        self.open_gripper()
@@ -471,184 +367,72 @@ class ProjectHades(object):
  def sample_air(self):
        self.go_to_joint_state()
        self.open_gripper()
-       waypoints = []
-       wpose = self.group.get_current_pose().pose
-       # orientation is from the top
-       orientation = quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4)
-       wpose.orientation = Quaternion(*orientation)
-       wpose.position.x = 0.4
-       wpose.position.y = -0.2
-       wpose.position.z = 0.52
-       waypoints.append(copy.deepcopy(wpose))
-       wpose = self.group.get_current_pose().pose
-       orientation = quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4)
-       wpose.orientation = Quaternion(*orientation)
-       wpose.position.x = 0.5
-       wpose.position.y = -0.2
-       wpose.position.z = 0.52
-       waypoints.append(copy.deepcopy(wpose))
-       (plan, fraction) = self.group.compute_cartesian_path(
-                                           waypoints,   # waypoints to follow
-                                           0.01,        # eef_step
-                                           0.0)         # jump_threshold
-       self.group.execute(plan, wait=True)
+
+       pose1 = self.create_waypoint(0.4, -0.2, 0.52, quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4))
+       pose2 = self.create_waypoint(0.5, -0.2, 0.52, quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4))
+       self.move_path([pose1, pose2])
+       
        self.close_gripper(0.02)
-       print("TAKING AIR QUALITY MEASUREMENTS")
        self.attach_box("airsampler")
+       print("TAKING AIR QUALITY MEASUREMENTS")
        rospy.sleep(1)
-      
+       
+       pose = self.create_waypoint(0.4, -0.2, 0.6, quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4))
+       self.move_path([pose])
+       rospy.sleep(2)
        print("---------------\nHeight: 0.6m")
        print("Particulate Matter 2.5: 33.8µg/m^3")
        print("Carbon Monoxide: 1575ppm")
-       waypoints = []
-       wpose = self.group.get_current_pose().pose
-       orientation = quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4)
-       wpose.orientation = Quaternion(*orientation)
-       wpose.position.x = 0.4
-       wpose.position.y = -0.2
-       wpose.position.z = 0.6
-       waypoints.append(copy.deepcopy(wpose))
-       (plan, fraction) = self.group.compute_cartesian_path(
-                                           waypoints,   # waypoints to follow
-                                           0.01,        # eef_step
-                                           0.0)         # jump_threshold
-       self.group.execute(plan, wait=True)
-       rospy.sleep(2)
       
+       pose = self.create_waypoint(0.4, -0.2, 0.7, quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4))
+       self.move_path([pose])
+       rospy.sleep(2)
        print("---------------\nHeight: 0.7m")
        print("Particulate Matter 2.5: 35.1µg/m^3")
        print("Carbon Monoxide: 1600ppm")
-       waypoints = []
-       wpose = self.group.get_current_pose().pose
-       orientation = quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4)
-       wpose.orientation = Quaternion(*orientation)
-       wpose.position.x = 0.4
-       wpose.position.y = -0.2
-       wpose.position.z = 0.7
-       waypoints.append(copy.deepcopy(wpose))
-       (plan, fraction) = self.group.compute_cartesian_path(
-                                           waypoints,   # waypoints to follow
-                                           0.01,        # eef_step
-                                           0.0)         # jump_threshold
-       self.group.execute(plan, wait=True)
-       rospy.sleep(2)
       
+       pose = self.create_waypoint(0.35, -0.12, 0.8, quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4))
+       self.move_path([pose])
+       rospy.sleep(2)
        print("---------------\nHeight: 0.8m")
        print("Particulate Matter 2.5: 36.4µg/m^3")
        print("Carbon Monoxide: 1597ppm")
-       waypoints = []
-       wpose = self.group.get_current_pose().pose
-       orientation = quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4)
-       wpose.orientation = Quaternion(*orientation)
-       wpose.position.x = 0.35
-       wpose.position.y = -0.12
-       wpose.position.z = 0.8
-       waypoints.append(copy.deepcopy(wpose))
-       (plan, fraction) = self.group.compute_cartesian_path(
-                                           waypoints,   # waypoints to follow
-                                           0.01,        # eef_step
-                                           0.0)         # jump_threshold
-       self.group.execute(plan, wait=True)
-       rospy.sleep(2)
       
+       pose = self.create_waypoint(0.3, -0.05, 0.9, quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4))
+       self.move_path([pose])
+       rospy.sleep(2)
        print("---------------\nHeight: 0.9m")
        print("Particulate Matter 2.5: 36.9µg/m^3")
        print("Carbon Monoxide: 1607ppm")
-       waypoints = []
-       wpose = self.group.get_current_pose().pose
-       orientation = quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4)
-       wpose.orientation = Quaternion(*orientation)
-       wpose.position.x = 0.30
-       wpose.position.y = -0.05
-       wpose.position.z = 0.9
-       waypoints.append(copy.deepcopy(wpose))
-       (plan, fraction) = self.group.compute_cartesian_path(
-                                           waypoints,   # waypoints to follow
-                                           0.01,        # eef_step
-                                           0.0)         # jump_threshold
-       self.group.execute(plan, wait=True)
-       rospy.sleep(2)
 
-
+       pose = self.create_waypoint(0.3, 0, 1.0, quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4))
+       self.move_path([pose])
        print("---------------\nHeight: 1.0m")
        print("Particulate Matter 2.5: 38.2µg/m^3")
        print("Carbon Monoxide: 1684ppm")
-       waypoints = []
-       wpose = self.group.get_current_pose().pose
-       orientation = quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4)
-       wpose.orientation = Quaternion(*orientation)
-       wpose.position.x = 0.3
-       wpose.position.y = 0.0
-       wpose.position.z = 1.0
-       waypoints.append(copy.deepcopy(wpose))
-       (plan, fraction) = self.group.compute_cartesian_path(
-                                           waypoints,   # waypoints to follow
-                                           0.01,        # eef_step
-                                           0.0)         # jump_threshold
-       self.group.execute(plan, wait=True)
        rospy.sleep(2)
 
-
-
+       pose = self.create_waypoint(0.25, 0, 1.1, quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4))
+       self.move_path([pose])
+       rospy.sleep(2)
        print("---------------\nHeight: 1.1m")
        print("Particulate Matter 2.5: 37.6µg/m^3")
        print("Carbon Monoxide: 1643ppm")
-       waypoints = []
-       wpose = self.group.get_current_pose().pose
-       orientation = quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4)
-       wpose.orientation = Quaternion(*orientation)
-       wpose.position.x = 0.25
-       wpose.position.y = 0.0
-       wpose.position.z = 1.1
-       waypoints.append(copy.deepcopy(wpose))
-       (plan, fraction) = self.group.compute_cartesian_path(
-                                           waypoints,   # waypoints to follow
-                                           0.01,        # eef_step
-                                           0.0)         # jump_threshold
-       self.group.execute(plan, wait=True)
-       rospy.sleep(2)
 
+       pose = self.create_waypoint(0.2, 0, 1.2, quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4))
+       self.move_path([pose])
+       rospy.sleep(2)
        print("---------------\nHeight: 1.2m")
        print("Particulate Matter 2.5: 37.3µg/m^3")
        print("Carbon Monoxide: 1656ppm")
-       waypoints = []
-       wpose = self.group.get_current_pose().pose
-       orientation = quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4)
-       wpose.orientation = Quaternion(*orientation)
-       wpose.position.x = 0.20
-       wpose.position.y = 0.0
-       wpose.position.z = 1.2
-       waypoints.append(copy.deepcopy(wpose))
-       (plan, fraction) = self.group.compute_cartesian_path(
-                                           waypoints,   # waypoints to follow
-                                           0.01,        # eef_step
-                                           0.0)         # jump_threshold
-       self.group.execute(plan, wait=True)
-       rospy.sleep(2)
 
 
        self.go_to_joint_state()
-       # return
-       waypoints = []
-       wpose = self.group.get_current_pose().pose
-       orientation = quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4)
-       wpose.orientation = Quaternion(*orientation)
-       wpose.position.x = 0.4
-       wpose.position.y = -0.2
-       wpose.position.z = 0.5
-       waypoints.append(copy.deepcopy(wpose))
-       wpose = self.group.get_current_pose().pose
-       orientation = quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4)
-       wpose.orientation = Quaternion(*orientation)
-       wpose.position.x = 0.5
-       wpose.position.y = -0.2
-       wpose.position.z = 0.5
-       waypoints.append(copy.deepcopy(wpose))
-       (plan, fraction) = self.group.compute_cartesian_path(
-                                           waypoints,   # waypoints to follow
-                                           0.01,        # eef_step
-                                           0.0)         # jump_threshold
-       self.group.execute(plan, wait=True)
+
+       pose1 = self.create_waypoint(0.4, -0.2, 0.5, quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4))
+       pose2 = self.create_waypoint(0.5, -0.2, 0.5, quaternion_from_euler(-tau / 4, -tau / 8, -tau / 4))
+       self.move_path([pose1, pose2])
+
        self.detach_box("airsampler")
        self.open_gripper()
        print("FINISHED AIR QUALITY MEASUREMENTS\n\n\n")
@@ -751,15 +535,12 @@ def main():
  try:
    hades = ProjectHades()
 
-
    hades.add_objects()
 
    rospy.sleep(1)
   
    hades.sample_air()
-  #  print("Water")
    hades.sample_water()
-  #  print("Surface")
    hades.sample_surface()
 
    rospy.sleep(5)
